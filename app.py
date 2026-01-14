@@ -8,6 +8,8 @@ from openai import OpenAI
 load_dotenv()
 
 app = Flask(__name__)
+
+# قراءة مفتاح OpenAI من متغيرات البيئة
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 @app.route("/", methods=["GET"])
@@ -18,21 +20,23 @@ def home():
 def generate():
     text = request.form.get("text", "").strip()
     if not text:
-        return "No text", 400
+        return "No text provided", 400
 
     prompt = f"""
-    Create a clean image with centered readable text.
-    The image must contain exactly this text:
-    "{text}"
+Create a clean minimal image.
+The image must contain ONLY this exact text:
+"{text}"
 
-    Rules:
-    - Perfect readability
-    - No extra symbols
-    - High contrast
-    - Minimal background
-    - Arabic text if input is Arabic
-    - English text if input is English
-    """
+Rules:
+- Perfect readability
+- No spelling changes
+- No extra symbols or words
+- Centered text
+- High contrast
+- Minimal background
+- Use Arabic typography if text is Arabic
+- Use English typography if text is English
+"""
 
     result = client.images.generate(
         model="gpt-image-1",
@@ -43,7 +47,11 @@ def generate():
     image_base64 = result.data[0].b64_json
     image_bytes = base64.b64decode(image_base64)
 
-    return send_file(io.BytesIO(image_bytes), mimetype="image/png")
+    return send_file(
+        io.BytesIO(image_bytes),
+        mimetype="image/png"
+    )
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=3000)
+    port = int(os.environ.get("PORT", 8080))  # Railway PORT
+    app.run(host="0.0.0.0", port=port)
