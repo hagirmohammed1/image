@@ -1,16 +1,9 @@
-import os
-import base64
-import io
 from flask import Flask, render_template, request, send_file
-from dotenv import load_dotenv
-from openai import OpenAI
-
-load_dotenv()
+from PIL import Image, ImageDraw, ImageFont
+import io
+import textwrap
 
 app = Flask(__name__)
-
-# قراءة مفتاح OpenAI من متغيرات البيئة
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 @app.route("/", methods=["GET"])
 def home():
@@ -22,36 +15,45 @@ def generate():
     if not text:
         return "No text provided", 400
 
-    prompt = f"""
-Create a clean minimal image.
-The image must contain ONLY this exact text:
-"{text}"
+    # إعداد الصورة
+    width, height = 1024, 1024
+    bg_color = "white"
+    text_color = "black"
 
-Rules:
-- Perfect readability
-- No spelling changes
-- No extra symbols or words
-- Centered text
-- High contrast
-- Minimal background
-- Use Arabic typography if text is Arabic
-- Use English typography if text is English
-"""
+    image = Image.new("RGB", (width, height), bg_color)
+    draw = ImageDraw.Draw(image)
 
-    result = client.images.generate(
-        model="gpt-image-1",
-        prompt=prompt,
-        size="1024x1024"
+    # خط افتراضي (يعمل دائمًا)
+    try:
+        font = ImageFont.truetype("DejaVuSans.ttf", 64)
+    except:
+        font = ImageFont.load_default()
+
+    # لف النص
+    wrapped_text = textwrap.fill(text, width=25)
+
+    # حساب التمركز
+    bbox = draw.multiline_textbbox((0, 0), wrapped_text, font=font, align="center")
+    text_width = bbox[2] - bbox[0]
+    text_height = bbox[3] - bbox[1]
+
+    x = (width - text_width) / 2
+    y = (height - text_height) / 2
+
+    draw.multiline_text(
+        (x, y),
+        wrapped_text,
+        fill=text_color,
+        font=font,
+        align="center"
     )
 
-    image_base64 = result.data[0].b64_json
-    image_bytes = base64.b64decode(image_base64)
+    # إخراج الصورة
+    img_io = io.BytesIO()
+    image.save(img_io, "PNG")
+    img_io.seek(0)
 
-    return send_file(
-        io.BytesIO(image_bytes),
-        mimetype="image/png"
-    )
+    return send_file(img_io, mimetype="image/png")
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8080))  # Railway PORT
-    app.run(host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=3000)
