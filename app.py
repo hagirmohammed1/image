@@ -1,39 +1,37 @@
 import os
-from flask import Flask, render_template, request, send_file
+from flask import Flask, render_template, request
 from PIL import Image, ImageDraw, ImageFont
 import io
+import base64
 
 app = Flask(__name__)
 
-@app.route("/", methods=["GET"])
+@app.route("/", methods=["GET", "POST"])
 def home():
-    return render_template("index.html")
+    image_data = None
 
-@app.route("/generate", methods=["POST"])
-def generate():
-    text = request.form.get("text", "").strip()
-    if not text:
-        return "No text", 400
+    if request.method == "POST":
+        text = request.form.get("text", "").strip()
+        if text:
+            img = Image.new("RGB", (1024, 1024), "#0f0f0f")
+            draw = ImageDraw.Draw(img)
 
-    img = Image.new("RGB", (1024, 1024), color="white")
-    draw = ImageDraw.Draw(img)
+            try:
+                font = ImageFont.truetype("arial.ttf", 90)
+            except:
+                font = ImageFont.load_default()
 
-    try:
-        font = ImageFont.truetype("arial.ttf", 80)
-    except:
-        font = ImageFont.load_default()
+            bbox = draw.textbbox((0, 0), text, font=font)
+            x = (1024 - (bbox[2] - bbox[0])) // 2
+            y = (1024 - (bbox[3] - bbox[1])) // 2
 
-    bbox = draw.textbbox((0, 0), text, font=font)
-    x = (1024 - (bbox[2] - bbox[0])) // 2
-    y = (1024 - (bbox[3] - bbox[1])) // 2
+            draw.text((x, y), text, fill="white", font=font)
 
-    draw.text((x, y), text, fill="black", font=font)
+            buf = io.BytesIO()
+            img.save(buf, format="PNG")
+            image_data = base64.b64encode(buf.getvalue()).decode()
 
-    buf = io.BytesIO()
-    img.save(buf, format="PNG")
-    buf.seek(0)
-
-    return send_file(buf, mimetype="image/png")
+    return render_template("index.html", image=image_data)
 
 
 if __name__ == "__main__":
